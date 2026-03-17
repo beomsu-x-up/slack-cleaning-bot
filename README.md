@@ -1,0 +1,150 @@
+# Slack 주간 담당 봇
+
+매주 월요일에 Slack 채널로 이번 주 담당자와 월별 전체 일정을 자동으로 올리는 예제입니다.
+
+이번 버전은 토스의 글 [슬랙봇 디자인 101](https://toss.tech/article/22439)을 참고해, `열람 전용 봇은 더 단순하고 빨리 읽혀야 한다`는 원칙에 맞춰 메시지 구조를 다시 잡았습니다. 이 글의 핵심을 현재 요구사항에 맞게 적용하면 아래처럼 정리됩니다.
+
+- 버튼 없이 한 번에 읽히는 `Block Kit` 메시지
+- 이번 주 담당을 가장 먼저 크게 노출
+- 전체 월간 일정은 아래에 압축해서 배치
+- 필요하면 워크스페이스 커스텀 이모지로 말투와 톤을 조정
+
+## 1. Slack 앱 만들기
+
+Slack 공식 문서 기준으로 가장 간단한 흐름은 매니페스트로 앱을 만들고, `chat:write` 권한을 포함한 뒤 워크스페이스에 설치하는 방식입니다.
+
+1. Slack 앱 관리 페이지에서 새 앱을 만듭니다.
+2. `From an app manifest`를 선택합니다.
+3. 이 저장소의 [`slack-app-manifest.yml`](/Users/beomsu/workspace/company/slack-bot/slack-app-manifest.yml) 내용을 붙여 넣습니다.
+4. 앱이 생성되면 `Install App` 또는 `OAuth & Permissions` 화면에서 워크스페이스에 설치합니다.
+5. 설치 후 `Bot User OAuth Token` 값을 복사합니다. 이 값은 `xoxb-...` 형태입니다.
+
+공식 문서:
+
+- 매니페스트로 앱 만들기: [Configuring apps with app manifests](https://docs.slack.dev/app-manifests/configuring-apps-with-app-manifests/)
+- 봇 토큰 설명: [Slack tokens](https://docs.slack.dev/authentication/tokens/)
+
+## 2. 채널에 봇 등록하기
+
+이 예제는 최소 권한인 `chat:write`만 사용하므로, 메시지를 보낼 채널에 봇을 초대해야 합니다.
+
+1. Slack에서 봇이 글을 올릴 채널로 이동합니다.
+2. 아래 명령으로 봇을 채널에 초대합니다.
+
+```text
+/invite @Weekly Duty Bot
+```
+
+3. 채널 상세 정보에서 채널 ID를 확인합니다. 보통 `C`로 시작합니다.
+4. 이 채널 ID를 `SLACK_CHANNEL_ID`로 사용합니다.
+
+공식 문서:
+
+- 메시지 전송 API: [chat.postMessage](https://docs.slack.dev/reference/methods/chat.postMessage)
+- 공개 채널 전체에 쓰고 싶을 때 필요한 추가 권한: [chat.postMessage channel membership note](https://docs.slack.dev/reference/methods/chat.postMessage)
+
+## 3. 로컬에서 테스트하기
+
+### 설치
+
+```bash
+npm install
+cp .env.example .env
+```
+
+`.env`에 값을 채웁니다.
+
+```dotenv
+SLACK_BOT_TOKEN=xoxb-your-bot-token
+SLACK_CHANNEL_ID=C0123456789
+SLACK_TIMEZONE=Asia/Seoul
+```
+
+### 메시지 미리보기
+
+```bash
+npm run send:weekly:dry-run
+```
+
+### Block Kit Builder용 JSON 출력
+
+토스 글에서도 언급된 것처럼 Slack 메시지는 블록 단위로 설계하는 게 좋습니다. 아래 명령으로 Block Kit Builder에 바로 붙여 넣을 JSON을 출력할 수 있습니다.
+
+```bash
+npm run send:weekly:builder
+```
+
+### 실제 전송
+
+```bash
+npm run send:weekly
+```
+
+## 4. GitHub Actions로 매주 월요일 자동 실행
+
+워크플로 파일은 [`post-weekly-duty.yml`](/Users/beomsu/workspace/company/slack-bot/.github/workflows/post-weekly-duty.yml)에 들어 있습니다.
+
+- `cron: '0 0 * * 1'` 는 UTC 기준 월요일 00:00입니다.
+- 한국 시간으로는 월요일 09:00입니다.
+
+GitHub 저장소의 `Settings > Secrets and variables > Actions` 에 아래 시크릿을 등록합니다.
+
+- `SLACK_BOT_TOKEN`
+- `SLACK_CHANNEL_ID`
+
+등록 후 `Actions` 탭에서 `Post weekly duty schedule` 워크플로를 `Run workflow`로 한 번 수동 실행해보면 됩니다.
+
+## 5. 현재 메시지 형식
+
+월요일 날짜가 속한 월의 주차를 기준으로 담당자를 계산합니다.
+
+- 1주차: 이용수, 김한수
+- 2주차: 장호민, 정성연
+- 3주차: 김범수, 방세현
+- 4주차: 구현모, 진민혁, (백승엽)
+- 5주차: 백승엽, 이용수
+
+Slack에는 아래와 같은 `읽기 전용 카드형 메시지`로 올라갑니다.
+
+```text
+2026년 3월 셋째 주 담당 안내
+이번 주 담당
+김범수 · 방세현
+
+월별 전체 일정
+▫️ 첫째 주  이용수, 김한수
+▫️ 둘째 주  장호민, 정성연
+👉 셋째 주  김범수, 방세현
+▫️ 넷째 주  구현모, 진민혁, (백승엽)
+▫️ 다섯째 주  백승엽, 이용수
+```
+
+브로드캐스트 멘션이 꼭 필요하면 `.env` 또는 GitHub Actions secret 환경값에 `SLACK_BROADCAST=channel` 또는 `SLACK_BROADCAST=here` 를 넣으면 됩니다. 기본값은 빈 값이며, 불필요한 알림 소음을 줄이기 위해 멘션 없이 보냅니다.
+
+강조 이모지도 바꿀 수 있습니다.
+
+```dotenv
+SLACK_HIGHLIGHT_EMOJI=:sparkles:
+```
+
+## 6. 디자인 원칙
+
+토스 글과 Slack 공식 문서를 현재 봇에 맞게 적용한 이유는 아래와 같습니다.
+
+- 이 봇은 `설정`이나 `입력`이 없는 단순 열람형이라 버튼이 필요 없습니다.
+- Slack 메시지는 HTML이 아니라 블록 기반이라, 텍스트 덩어리보다 `header`, `section`, `context`, `divider` 조합이 읽기 쉽습니다.
+- 전체 일정을 모두 보여주되, 사용자가 실제로 봐야 하는 `이번 주 담당`을 맨 위에 둬야 합니다.
+- 팀 문화에 맞는 커스텀 이모지를 쓰면 더 빠르게 눈에 들어오게 만들 수 있습니다.
+
+참고 링크:
+
+- 토스 글: [슬랙봇 디자인 101](https://toss.tech/article/22439)
+- Slack Block Kit 개요: [Block Kit](https://docs.slack.dev/block-kit)
+- Block 종류 참고: [Block Kit blocks reference](https://docs.slack.dev/reference/block-kit/blocks)
+
+## 7. 동작 방식 바꾸기
+
+현재는 `날짜의 일(day)` 기준으로 `1~7일`, `8~14일` 식으로 주차를 계산합니다. 예를 들어 29~31일에 해당하는 월요일은 5주차로 처리됩니다.
+
+메시지 레이아웃이나 문구를 바꾸고 싶다면 [`message-builder.js`](/Users/beomsu/workspace/company/slack-bot/src/message-builder.js)를 수정하면 됩니다.
+# slack-cleaning-bot
