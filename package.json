@@ -1,0 +1,20 @@
+{
+  "name": "slack-weekly-duty-bot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Posts a weekly duty schedule to Slack every Monday.",
+  "type": "module",
+  "scripts": {
+    "send:weekly": "node src/post-weekly-duty.js",
+    "send:weekly:dry-run": "node src/post-weekly-duty.js --dry-run",
+    "send:weekly:builder": "node src/post-weekly-duty.js --builder-json",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@slack/web-api": "^7.12.0",
+    "dotenv": "^17.2.3"
+  }
+}
