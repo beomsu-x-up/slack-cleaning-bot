@@ -1,6 +1,6 @@
-# Slack 주간 담당 봇
+# Slack 알림 봇
 
-매주 월요일에 Slack 채널로 이번 주 담당자와 월별 전체 일정을 자동으로 올리는 예제입니다.
+매주 월요일에 주간 담당표를 보내고, 매주 금요일에 식물 물주기 알림을 보내는 예제입니다.
 
 이번 버전은 토스의 글 [슬랙봇 디자인 101](https://toss.tech/article/22439)을 참고해, `열람 전용 봇은 더 단순하고 빨리 읽혀야 한다`는 원칙에 맞춰 메시지 구조를 다시 잡았습니다. 이 글의 핵심을 현재 요구사항에 맞게 적용하면 아래처럼 정리됩니다.
 
@@ -80,19 +80,39 @@ npm run send:weekly:builder
 npm run send:weekly
 ```
 
-## 4. GitHub Actions로 매주 월요일 자동 실행
+금요일 식물 물주기 알림도 같은 방식으로 확인할 수 있습니다.
 
-워크플로 파일은 [`post-weekly-duty.yml`](/Users/beomsu/workspace/company/slack-bot/.github/workflows/post-weekly-duty.yml)에 들어 있습니다.
+```bash
+npm run send:plant:dry-run
+npm run send:plant
+```
+
+## 4. GitHub Actions로 자동 실행
+
+워크플로 파일은 아래 두 개입니다.
+
+- [`post-weekly-duty.yml`](/Users/beomsu/workspace/company/slack-bot/.github/workflows/post-weekly-duty.yml)
+- [`post-plant-reminder.yml`](/Users/beomsu/workspace/company/slack-bot/.github/workflows/post-plant-reminder.yml)
 
 - `cron: '0 0 * * 1'` 는 UTC 기준 월요일 00:00입니다.
 - 한국 시간으로는 월요일 09:00입니다.
+- `cron: '0 0 * * 5'` 는 UTC 기준 금요일 00:00입니다.
+- 한국 시간으로는 금요일 09:00입니다.
 
 GitHub 저장소의 `Settings > Secrets and variables > Actions` 에 아래 시크릿을 등록합니다.
 
 - `SLACK_BOT_TOKEN`
 - `SLACK_CHANNEL_ID`
+- `SLACK_PLANT_CHANNEL_ID` 선택 사항. 비워두면 `SLACK_CHANNEL_ID` 채널로 같이 보냅니다.
+
+선택 사항으로 아래 Repository Variables 도 넣을 수 있습니다.
+
+- `SLACK_PLANT_BROADCAST`
+- `SLACK_PLANT_EMOJI`
+- `SLACK_PLANT_WATER_EMOJI`
 
 등록 후 `Actions` 탭에서 `Post weekly duty schedule` 워크플로를 `Run workflow`로 한 번 수동 실행해보면 됩니다.
+식물 알림은 `Post plant watering reminder` 워크플로를 같은 방식으로 실행하면 됩니다.
 
 ## 5. 현재 메시지 형식
 
@@ -147,4 +167,6 @@ SLACK_HIGHLIGHT_EMOJI=:sparkles:
 현재는 `날짜의 일(day)` 기준으로 `1~7일`, `8~14일` 식으로 주차를 계산합니다. 예를 들어 29~31일에 해당하는 월요일은 5주차로 처리됩니다.
 
 메시지 레이아웃이나 문구를 바꾸고 싶다면 [`message-builder.js`](/Users/beomsu/workspace/company/slack-bot/src/message-builder.js)를 수정하면 됩니다.
+
+금요일 식물 물주기 문구를 바꾸고 싶다면 [`plant-reminder-builder.js`](/Users/beomsu/workspace/company/slack-bot/src/plant-reminder-builder.js)를 수정하면 됩니다.
 # slack-cleaning-bot

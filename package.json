@@ -8,6 +8,9 @@
     "send:weekly": "node src/post-weekly-duty.js",
     "send:weekly:dry-run": "node src/post-weekly-duty.js --dry-run",
     "send:weekly:builder": "node src/post-weekly-duty.js --builder-json",
+    "send:plant": "node src/post-plant-reminder.js",
+    "send:plant:dry-run": "node src/post-plant-reminder.js --dry-run",
+    "send:plant:builder": "node src/post-plant-reminder.js --builder-json",
     "test": "node --test"
   },
   "engines": {

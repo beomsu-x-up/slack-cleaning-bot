@@ -1,0 +1,30 @@
+@import "@xmoothie/ui/styles.css";
+@import "tailwindcss";
+
+:root {
+  --colors-default-background: #f2f1f0;
+  --colors-default-foreground: #272423;
+  --colors-card: #ffffff;
+  --colors-card-foreground: #272423;
+  --colors-card: #ffffff;
+  --colors-card-foreground: #525252;
+  --colors-primary: #e53434;
+  --colors-brand-primary: #e53434;
+  --colors-primary-foreground: #1e2723;
+  --colors-secondary: #f4f4f4;
+  --colors-secondary-foreground: #272423;
+  --colors-muted: #ededed;
+  --colors-muted-foreground: #272423;
+  --colors-accent: #ededed;
+  --colors-accent-foreground: #202020;
+  --colors-destructive: #fa4d56;
+  --colors-destructive-foreground: #fffcfc;
+  --colors-border-default: #a8a8a8;
+  --colors-input: #e0e0e0;
+  --colors-ring: #bbfb70;
+  --colors-border-focus: #bbfb70;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+}
