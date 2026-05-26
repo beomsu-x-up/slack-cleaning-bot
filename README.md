@@ -169,4 +169,42 @@ SLACK_HIGHLIGHT_EMOJI=:sparkles:
 메시지 레이아웃이나 문구를 바꾸고 싶다면 [`message-builder.js`](/Users/beomsu/workspace/company/slack-bot/src/message-builder.js)를 수정하면 됩니다.
 
 금요일 식물 물주기 문구를 바꾸고 싶다면 [`plant-reminder-builder.js`](/Users/beomsu/workspace/company/slack-bot/src/plant-reminder-builder.js)를 수정하면 됩니다.
-# slack-cleaning-bot
+
+## 8. 지원사업 스크래핑 알림
+
+CMS(Directus)의 "지원사업 알림 대상" 컬렉션(대상 페이지 링크 + 키워드 + 기관)을 매일 아침 09:00 KST에 스크래핑해서, 키워드가 포함된 **새 게시글**을 Slack으로 알립니다.
+
+- 각 대상 페이지를 **Playwright(헤드리스 Chromium)** 로 렌더링 → SSR/SPA 모두 처리.
+- 렌더된 DOM 링크 중 텍스트에 키워드가 포함된 게시글을 추출.
+- Directus `scraping_seen` 컬렉션과 대조해 **아직 알리지 않은 글만** 전송, 보낸 글은 기록(`post_url` unique → 중복 방지).
+- **부트스트랩**: 특정 대상에 기록이 0건이면(최초 실행) 현재 글을 알림 없이 기록만 → 첫날 폭탄 방지. 다음 실행부터 진짜 새 글만 알림.
+
+### 환경변수 (`.env`)
+
+```dotenv
+DIRECTUS_URL=https://xup-homepage-cms-9635953230.asia-northeast3.run.app
+DIRECTUS_TOKEN=<대상 read + scraping_seen read/write 권한 static 토큰>
+SLACK_SUPPORT_CHANNEL_ID=<없으면 SLACK_CHANNEL_ID로 폴백>
+# (선택) TARGET_COLLECTION/TARGET_*_FIELD/SEEN_COLLECTION 으로 override
+```
+
+### 로컬 실행
+
+```bash
+npm install
+npx playwright install --with-deps chromium
+npm run send:support:dry-run   # 스크래핑 + 매칭 결과만 출력(미전송, 미기록)
+npm run send:support           # 실제 전송 + 기록
+```
+
+### 자동 실행
+
+- 워크플로: [`post-support-notify.yml`](/Users/beomsu/workspace/company/slack-bot/.github/workflows/post-support-notify.yml) — `cron: '0 0 * * *'`(UTC) = 09:00 KST + 수동 실행.
+- repo secrets: `DIRECTUS_URL`, `DIRECTUS_TOKEN`, `SLACK_BOT_TOKEN`, `SLACK_SUPPORT_CHANNEL_ID`(또는 `SLACK_CHANNEL_ID`).
+- `scraping_seen` 컬렉션은 cms 레포 `apply-schema.mjs`로 멱등 생성됩니다.
+- 메시지 형식을 바꾸려면 [`support-notify-builder.js`](/Users/beomsu/workspace/company/slack-bot/src/support-notify-builder.js)를 수정합니다.
+
+### 한계
+
+- 링크 텍스트 기반 키워드 매칭이라 제목이 링크 텍스트가 아닌 특이 구조 사이트는 놓칠 수 있습니다(대상별 셀렉터는 추후 확장).
+- GitHub 러너 IP가 해외라 일부 정부 사이트가 차단할 수 있습니다. 차단 시 GCP Cloud Run Job 전환 검토.

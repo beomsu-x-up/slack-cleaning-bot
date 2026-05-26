@@ -11,6 +11,8 @@
     "send:plant": "node src/post-plant-reminder.js",
     "send:plant:dry-run": "node src/post-plant-reminder.js --dry-run",
     "send:plant:builder": "node src/post-plant-reminder.js --builder-json",
+    "send:support": "node src/post-support-notify.js",
+    "send:support:dry-run": "node src/post-support-notify.js --dry-run",
     "test": "node --test"
   },
   "engines": {
@@ -18,6 +20,7 @@
   },
   "dependencies": {
     "@slack/web-api": "^7.12.0",
-    "dotenv": "^17.2.3"
+    "dotenv": "^17.2.3",
+    "playwright": "^1.49.1"
   }
 }
