@@ -2,7 +2,7 @@ name: Post support program notifications
 
 on:
   schedule:
-    - cron: '0 0 * * *' # 00:00 UTC = 09:00 KST
+    - cron: '17 0 * * *' # 00:17 UTC = 09:17 KST (정시 혼잡 회피로 지연 최소화)
   workflow_dispatch:
 
 jobs:

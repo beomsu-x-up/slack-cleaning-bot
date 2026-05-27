@@ -199,7 +199,7 @@ npm run send:support           # 실제 전송 + 기록
 
 ### 자동 실행
 
-- 워크플로: [`post-support-notify.yml`](/Users/beomsu/workspace/company/slack-bot/.github/workflows/post-support-notify.yml) — `cron: '0 0 * * *'`(UTC) = 09:00 KST + 수동 실행.
+- 워크플로: [`post-support-notify.yml`](/Users/beomsu/workspace/company/slack-bot/.github/workflows/post-support-notify.yml) — `cron: '17 0 * * *'`(UTC) = 09:17 KST + 수동 실행. (정시 `:00`은 GitHub cron 혼잡으로 지연이 커서 분을 옮김. 그래도 GitHub 예약은 best-effort라 다소 늦을 수 있음.)
 - repo secrets: `DIRECTUS_URL`, `DIRECTUS_TOKEN`, `SLACK_BOT_TOKEN`, `SLACK_SUPPORT_CHANNEL_ID`(또는 `SLACK_CHANNEL_ID`).
 - `scraping_seen` 컬렉션은 cms 레포 `apply-schema.mjs`로 멱등 생성됩니다.
 - 메시지 형식을 바꾸려면 [`support-notify-builder.js`](/Users/beomsu/workspace/company/slack-bot/src/support-notify-builder.js)를 수정합니다.
