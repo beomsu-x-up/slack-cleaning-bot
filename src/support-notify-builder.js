@@ -5,6 +5,42 @@ function escapeText(value) {
   return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// Slack section 블록 text는 최대 3000자. 한도에 여유를 두고 청크를 나눈다.
+const SECTION_TEXT_LIMIT = 2900;
+
+function sectionBlock(text) {
+  return { type: 'section', text: { type: 'mrkdwn', text } };
+}
+
+function truncateLine(line) {
+  if (line.length <= SECTION_TEXT_LIMIT) return line;
+  return line.slice(0, SECTION_TEXT_LIMIT - 1) + '…';
+}
+
+// 그룹 하나를 3000자 한도를 넘지 않도록 여러 섹션 블록으로 나눈다.
+// 첫 블록은 기관 헤더 + 글 목록, 이어지는 블록은 헤더 반복 없이 글 목록만.
+function buildGroupBlocks(group) {
+  const header = `*${escapeText(group.org)}*  <${group.sourceUrl}|대상 페이지>`;
+  const lines = group.posts.map(
+    (p) => truncateLine(`• <${p.url}|${escapeText(p.title)}>  _(${escapeText(p.keyword)})_`)
+  );
+
+  const blocks = [];
+  let current = header;
+
+  for (const line of lines) {
+    const candidate = `${current}\n${line}`;
+    if (candidate.length > SECTION_TEXT_LIMIT) {
+      blocks.push(sectionBlock(current));
+      current = line;
+    } else {
+      current = candidate;
+    }
+  }
+  blocks.push(sectionBlock(current));
+  return blocks;
+}
+
 export function buildSupportNotifyPayload(groups = []) {
   const filledGroups = groups.filter((group) => group.posts.length > 0);
   const totalPosts = filledGroups.reduce((sum, group) => sum + group.posts.length, 0);
@@ -24,17 +60,7 @@ export function buildSupportNotifyPayload(groups = []) {
   const textLines = [headline];
 
   for (const group of filledGroups) {
-    const lines = group.posts
-      .map((p) => `• <${p.url}|${escapeText(p.title)}>  _(${escapeText(p.keyword)})_`)
-      .join('\n');
-
-    blocks.push({
-      type: 'section',
-      text: {
-        type: 'mrkdwn',
-        text: `*${escapeText(group.org)}*  <${group.sourceUrl}|대상 페이지>\n${lines}`
-      }
-    });
+    for (const block of buildGroupBlocks(group)) blocks.push(block);
 
     textLines.push(`[${group.org}]`);
     for (const p of group.posts) textLines.push(`- ${p.title} (${p.keyword}) ${p.url}`);

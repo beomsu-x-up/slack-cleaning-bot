@@ -26,6 +26,25 @@ test('그룹별 게시글을 헤더+섹션으로 묶는다', () => {
   assert.match(payload.text, /AI 지원사업 공고 \(AI\)/);
 });
 
+test('한 그룹 글이 많아도 섹션 텍스트는 3000자 한도를 넘지 않는다', () => {
+  const posts = Array.from({ length: 200 }, (_, i) => ({
+    title: `지원사업 공고 제목이 제법 길어서 누적되는 케이스 ${i}`,
+    url: `https://example.com/post/${i}`,
+    keyword: '지원'
+  }));
+
+  const payload = buildSupportNotifyPayload([
+    { org: '대량기관', sourceUrl: 'https://example.com/list', posts }
+  ]);
+
+  const sections = payload.blocks.filter((b) => b.type === 'section');
+  assert.ok(sections.length > 1, '여러 섹션 블록으로 분할되어야 한다');
+  for (const block of sections) {
+    assert.ok(block.text.text.length <= 3000, `섹션 텍스트가 3000자를 넘음: ${block.text.text.length}`);
+  }
+  assert.equal(payload.meta.totalPosts, 200);
+});
+
 test('제목의 특수문자를 이스케이프한다', () => {
   const payload = buildSupportNotifyPayload([
     {
