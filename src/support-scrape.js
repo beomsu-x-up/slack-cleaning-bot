@@ -4,16 +4,18 @@ import { chromium } from 'playwright';
 import { toAbsoluteUrl } from './support-url.js';
 import { parseAnchorsFromHtml } from './support-html.js';
 
-const NAV_TIMEOUT_MS = 30_000;
+const NAV_TIMEOUT_MS = 25_000;
 const NETWORK_IDLE_MS = 4_000; // SPA 렌더가 끝날 만큼만 idle 대기 (실패해도 무시)
 const SETTLE_MS = 1_500; // idle 이후 JS 추가 렌더 대기
-const NAV_RETRIES = 1; // 일시적 타임아웃/연결 리셋 완화용 재시도 횟수
+const NAV_RETRIES = 1; // 즉시 실패(연결 리셋 등)만 재시도
 
 export async function createBrowser() {
   return chromium.launch({ headless: true });
 }
 
-// 페이지 진입. 일시적 실패(타임아웃/연결 리셋)는 한 번 재시도한다.
+// 페이지 진입. 연결 리셋 등 '즉시 실패'만 한 번 재시도한다.
+// 타임아웃은 재시도하면 26개 순차 처리 시 시간이 2배로 늘어 job 타임아웃을
+// 넘길 수 있으므로 재시도하지 않는다(서버가 25s 내 응답 못 하면 재시도도 무의미).
 async function navigate(page, pageUrl) {
   for (let attempt = 0; attempt <= NAV_RETRIES; attempt++) {
     try {
@@ -25,7 +27,8 @@ async function navigate(page, pageUrl) {
       await page.waitForTimeout(SETTLE_MS);
       return;
     } catch (error) {
-      if (attempt === NAV_RETRIES) throw error;
+      const isTimeout = /timeout/i.test(error.message);
+      if (attempt === NAV_RETRIES || isTimeout) throw error;
       await page.waitForTimeout(1_500);
     }
   }
