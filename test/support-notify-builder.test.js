@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildSupportNotifyPayload } from '../src/support-notify-builder.js';
+import { buildSupportNotifyPayload, chunkBlocks } from '../src/support-notify-builder.js';
 
 test('새 글이 없으면 totalPosts 0', () => {
   const payload = buildSupportNotifyPayload([]);
@@ -43,6 +43,21 @@ test('한 그룹 글이 많아도 섹션 텍스트는 3000자 한도를 넘지 �
     assert.ok(block.text.text.length <= 3000, `섹션 텍스트가 3000자를 넘음: ${block.text.text.length}`);
   }
   assert.equal(payload.meta.totalPosts, 200);
+});
+
+test('chunkBlocks는 메시지당 블록 수를 한도 이하로 나눈다', () => {
+  const blocks = Array.from({ length: 100 }, (_, i) => ({ type: 'section', text: { type: 'mrkdwn', text: `${i}` } }));
+  const chunks = chunkBlocks(blocks);
+  assert.ok(chunks.length >= 3, '100블록은 여러 메시지로 나뉘어야 한다');
+  for (const chunk of chunks) assert.ok(chunk.length <= 45, '한 메시지가 45블록을 넘으면 안 된다');
+  assert.equal(chunks.flat().length, 100, '블록 총량은 보존되어야 한다');
+});
+
+test('블록이 한도 이하면 단일 메시지', () => {
+  const payload = buildSupportNotifyPayload([
+    { org: 'X', sourceUrl: 'https://example.com', posts: [{ title: 'a', url: 'https://example.com/1', keyword: 'a' }] }
+  ]);
+  assert.equal(chunkBlocks(payload.blocks).length, 1);
 });
 
 test('제목의 특수문자를 이스케이프한다', () => {

@@ -12,7 +12,7 @@ import {
 } from './support-directus.js';
 import { normalizeUrl } from './support-url.js';
 import { createBrowser, scrapeTarget } from './support-scrape.js';
-import { buildSupportNotifyPayload } from './support-notify-builder.js';
+import { buildSupportNotifyPayload, chunkBlocks } from './support-notify-builder.js';
 
 function buildRecord(targetId, post) {
   return {
@@ -112,8 +112,18 @@ async function main() {
     if (!channel) throw new Error('SLACK_SUPPORT_CHANNEL_ID(또는 SLACK_CHANNEL_ID)가 필요합니다.');
 
     const client = new WebClient(token);
-    await client.chat.postMessage({ channel, text: payload.text, blocks: payload.blocks });
-    console.log(`Posted ${payload.meta.totalPosts} support posts to ${channel}`);
+    // 50블록 한도를 넘지 않도록 여러 메시지로 나눠 전송. 첫 메시지만 전체 fallback
+    // text를 싣고, 이어지는 메시지는 헤드라인만(알림 중복 방지).
+    const headline = payload.text.split('\n')[0];
+    const messages = chunkBlocks(payload.blocks);
+    for (let i = 0; i < messages.length; i++) {
+      await client.chat.postMessage({
+        channel,
+        text: i === 0 ? payload.text : headline,
+        blocks: messages[i]
+      });
+    }
+    console.log(`Posted ${payload.meta.totalPosts} support posts to ${channel} (${messages.length} msg)`);
 
     // 전송 성공 후 기록 (실패 시 다음 run 재시도 가능).
     for (const plan of plans.filter((p) => !p.isBootstrap)) {

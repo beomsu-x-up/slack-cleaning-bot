@@ -41,6 +41,17 @@ function buildGroupBlocks(group) {
   return blocks;
 }
 
+// Slack은 메시지당 블록 최대 50개. 한도에 여유를 두고 여러 메시지로 나눈다.
+const MAX_BLOCKS_PER_MESSAGE = 45;
+
+export function chunkBlocks(blocks, size = MAX_BLOCKS_PER_MESSAGE) {
+  const chunks = [];
+  for (let i = 0; i < blocks.length; i += size) {
+    chunks.push(blocks.slice(i, i + size));
+  }
+  return chunks;
+}
+
 export function buildSupportNotifyPayload(groups = []) {
   const filledGroups = groups.filter((group) => group.posts.length > 0);
   const totalPosts = filledGroups.reduce((sum, group) => sum + group.posts.length, 0);
