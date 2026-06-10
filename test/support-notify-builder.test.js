@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildSupportNotifyPayload, chunkBlocks } from '../src/support-notify-builder.js';
+import {
+  buildSupportNotifyPayload,
+  buildFailureNotifyPayload,
+  chunkBlocks
+} from '../src/support-notify-builder.js';
 
 test('새 글이 없으면 totalPosts 0', () => {
   const payload = buildSupportNotifyPayload([]);
@@ -58,6 +62,49 @@ test('블록이 한도 이하면 단일 메시지', () => {
     { org: 'X', sourceUrl: 'https://example.com', posts: [{ title: 'a', url: 'https://example.com/1', keyword: 'a' }] }
   ]);
   assert.equal(chunkBlocks(payload.blocks).length, 1);
+});
+
+test('실패가 없으면 totalFailures 0, 빈 블록', () => {
+  const payload = buildFailureNotifyPayload([], '2026-06-10 13:51');
+  assert.equal(payload.meta.totalFailures, 0);
+  assert.deepEqual(payload.blocks, []);
+});
+
+test('실패 목록을 시각·이유와 함께 알림으로 만든다', () => {
+  const payload = buildFailureNotifyPayload(
+    [
+      { label: '문화체육관광부 (id=12)', reason: 'page.goto: Timeout 25000ms exceeded.' },
+      { label: '대상 목록 로드', reason: 'GET /items 실패: 503 Under pressure' }
+    ],
+    '2026-06-10 13:51'
+  );
+  assert.equal(payload.meta.totalFailures, 2);
+  assert.equal(payload.blocks[0].type, 'header');
+  assert.match(payload.blocks[0].text.text, /일부 실패 2건/);
+  assert.match(payload.blocks[1].text.text, /2026-06-10 13:51/);
+  assert.match(payload.blocks[1].text.text, /문화체육관광부 \(id=12\)/);
+  assert.match(payload.text, /Timeout 25000ms/);
+});
+
+test('실패 이유의 줄바꿈은 한 줄로 정리하고 과도하게 길면 자른다', () => {
+  const payload = buildFailureNotifyPayload(
+    [{ label: 'X', reason: 'a\nb\n' + 'z'.repeat(500) }],
+    'now'
+  );
+  const section = payload.blocks.find((b) => b.type === 'section');
+  assert.ok(!section.text.text.includes('\na'), '이유의 개행이 그대로 남으면 안 된다');
+  assert.ok(section.text.text.includes('…'), '긴 이유는 …로 잘려야 한다');
+});
+
+test('실패가 아주 많아도 섹션 텍스트는 3000자 한도를 넘지 않는다', () => {
+  const failures = Array.from({ length: 100 }, (_, i) => ({
+    label: `기관 이름이 제법 길어서 누적되는 케이스 ${i} (id=${i})`,
+    reason: 'page.goto: Timeout 25000ms exceeded at https://example.gov/very/long/path'
+  }));
+  const payload = buildFailureNotifyPayload(failures, 'now');
+  for (const block of payload.blocks.filter((b) => b.type === 'section')) {
+    assert.ok(block.text.text.length <= 3000, `섹션 텍스트가 3000자를 넘음: ${block.text.text.length}`);
+  }
 });
 
 test('제목의 특수문자를 이스케이프한다', () => {

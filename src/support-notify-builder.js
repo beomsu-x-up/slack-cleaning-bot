@@ -17,28 +17,33 @@ function truncateLine(line) {
   return line.slice(0, SECTION_TEXT_LIMIT - 1) + '…';
 }
 
-// 그룹 하나를 3000자 한도를 넘지 않도록 여러 섹션 블록으로 나눈다.
-// 첫 블록은 기관 헤더 + 글 목록, 이어지는 블록은 헤더 반복 없이 글 목록만.
-function buildGroupBlocks(group) {
-  const header = `*${escapeText(group.org)}*  <${group.sourceUrl}|대상 페이지>`;
-  const lines = group.posts.map(
-    (p) => truncateLine(`• <${p.url}|${escapeText(p.title)}>  _(${escapeText(p.keyword)})_`)
-  );
-
+// header + lines를 3000자 한도를 넘지 않는 여러 섹션 블록으로 나눈다.
+// header가 빈 문자열이면 글 목록만으로 시작한다.
+function linesToSections(header, lines) {
   const blocks = [];
   let current = header;
 
-  for (const line of lines) {
-    const candidate = `${current}\n${line}`;
+  for (const raw of lines) {
+    const line = truncateLine(raw);
+    const candidate = current ? `${current}\n${line}` : line;
     if (candidate.length > SECTION_TEXT_LIMIT) {
-      blocks.push(sectionBlock(current));
+      if (current) blocks.push(sectionBlock(current));
       current = line;
     } else {
       current = candidate;
     }
   }
-  blocks.push(sectionBlock(current));
+  if (current) blocks.push(sectionBlock(current));
   return blocks;
+}
+
+// 그룹 하나를 헤더 + 글 목록 섹션 블록(들)로. 첫 블록은 기관 헤더 포함.
+function buildGroupBlocks(group) {
+  const header = `*${escapeText(group.org)}*  <${group.sourceUrl}|대상 페이지>`;
+  const lines = group.posts.map(
+    (p) => `• <${p.url}|${escapeText(p.title)}>  _(${escapeText(p.keyword)})_`
+  );
+  return linesToSections(header, lines);
 }
 
 // Slack은 메시지당 블록 최대 50개. 한도에 여유를 두고 여러 메시지로 나눈다.
@@ -78,4 +83,30 @@ export function buildSupportNotifyPayload(groups = []) {
   }
 
   return { text: textLines.join('\n'), blocks, meta: { totalPosts } };
+}
+
+// 이유 문자열을 한 줄로 정리하고 너무 길면 자른다.
+function oneLineReason(reason, max = 300) {
+  const flat = String(reason ?? '알 수 없는 오류').replace(/\s+/g, ' ').trim();
+  return flat.length > max ? flat.slice(0, max - 1) + '…' : flat;
+}
+
+// 실패 목록을 Slack 알림(payload)으로. failures: [{ label, reason }]
+// whenLabel: 사람이 읽는 시각 문자열(KST).
+export function buildFailureNotifyPayload(failures = [], whenLabel = '') {
+  if (!failures.length) return { text: '', blocks: [], meta: { totalFailures: 0 } };
+
+  const title = `⚠️ 지원사업 알림 일부 실패 ${failures.length}건`;
+  const intro = `${whenLabel ? whenLabel + ' · ' : ''}아래 대상을 이번 회차에서 건너뛰었습니다. 다음 회차에 자동 재시도됩니다.`;
+  const lines = failures.map((f) => `• *${escapeText(f.label)}* — ${escapeText(oneLineReason(f.reason))}`);
+
+  const blocks = [
+    { type: 'header', text: { type: 'plain_text', text: title, emoji: true } },
+    ...linesToSections(intro, lines)
+  ];
+
+  const textLines = [title, intro.replace(/[*_<>]/g, '')];
+  for (const f of failures) textLines.push(`- ${f.label}: ${oneLineReason(f.reason)}`);
+
+  return { text: textLines.join('\n'), blocks, meta: { totalFailures: failures.length } };
 }

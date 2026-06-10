@@ -24,25 +24,57 @@ export const fields = {
 
 export const seenCollection = process.env.SEEN_COLLECTION || 'scraping_seen';
 
-async function request(endpoint, options = {}) {
-  const response = await fetch(`${baseUrl()}${endpoint}`, {
-    method: options.method || 'GET',
-    headers: {
-      Authorization: `Bearer ${token()}`,
-      ...(options.body ? { 'Content-Type': 'application/json' } : {})
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined
-  });
+const MAX_RETRIES = 3;
+const RETRY_BASE_MS = 1_000;
+// 일시적 서버 오류: 502/503/504(과부하·재기동), 429(레이트리밋). 재시도로 회복 가능.
+const TRANSIENT_STATUS = new Set([429, 502, 503, 504]);
 
-  if (!response.ok) {
-    const text = await response.text();
-    const error = new Error(`${options.method || 'GET'} ${endpoint} 실패: ${response.status} ${text}`);
-    error.status = response.status;
-    throw error;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function request(endpoint, options = {}) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    let response;
+    try {
+      response = await fetch(`${baseUrl()}${endpoint}`, {
+        method: options.method || 'GET',
+        headers: {
+          Authorization: `Bearer ${token()}`,
+          ...(options.body ? { 'Content-Type': 'application/json' } : {})
+        },
+        body: options.body ? JSON.stringify(options.body) : undefined
+      });
+    } catch (networkError) {
+      // fetch 자체 실패(네트워크/DNS/연결 끊김)도 일시적일 수 있어 재시도.
+      lastError = networkError;
+      if (attempt < MAX_RETRIES) {
+        await sleep(RETRY_BASE_MS * 2 ** (attempt - 1));
+        continue;
+      }
+      throw networkError;
+    }
+
+    if (!response.ok) {
+      const text = await response.text();
+      const error = new Error(`${options.method || 'GET'} ${endpoint} 실패: ${response.status} ${text}`);
+      error.status = response.status;
+
+      if (TRANSIENT_STATUS.has(response.status) && attempt < MAX_RETRIES) {
+        const waitMs = RETRY_BASE_MS * 2 ** (attempt - 1);
+        console.warn(`Directus ${response.status} 일시 오류, ${waitMs}ms 후 재시도 (${attempt}/${MAX_RETRIES - 1}): ${endpoint}`);
+        lastError = error;
+        await sleep(waitMs);
+        continue;
+      }
+      throw error;
+    }
+
+    if (response.status === 204) return null;
+    return response.json();
   }
 
-  if (response.status === 204) return null;
-  return response.json();
+  throw lastError;
 }
 
 // 대상 컬렉션 이름: env 우선, 없으면 한글 표시명으로 자동 탐색.
