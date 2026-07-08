@@ -1,8 +1,7 @@
 name: Post plant watering reminder
 
 on:
-  schedule:
-    - cron: '0 0 * * 5'
+  # 자동 알림 중단(2026-07). 수동 실행만 유지.
   workflow_dispatch:
 
 jobs:
